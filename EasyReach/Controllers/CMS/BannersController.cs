@@ -2,6 +2,7 @@
 using EasyReach_Application.CQRS.Querys.CMS;
 using EasyReach_Application.DTOs.CMS;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EasyReach.Controllers.CMS
@@ -17,9 +18,11 @@ namespace EasyReach.Controllers.CMS
         public async Task<IActionResult> GetById(Guid id) => Ok(await mediator.Send(new GetBannerByIdQuery(id)));
 
         [HttpPost]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> Create([FromBody] CreateBannerDto dto) => Ok(await mediator.Send(new CreateBannerCommand(dto)));
 
         [HttpPut("{id:guid}")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBannerDto dto)
         {
             dto.Id = id;
@@ -27,6 +30,8 @@ namespace EasyReach.Controllers.CMS
         }
 
         [HttpDelete("{id:guid}")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> Delete(Guid id) => Ok(await mediator.Send(new DeleteBannerCommand(id)));
     }
 }
+

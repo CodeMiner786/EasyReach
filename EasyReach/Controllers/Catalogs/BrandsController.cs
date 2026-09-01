@@ -2,6 +2,7 @@
 using EasyReach_Application.CQRS.Querys.Brands;
 using EasyReach_Application.DTOs.Catalogs;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EasyReach.Controllers.Catalogs
@@ -19,6 +20,7 @@ namespace EasyReach.Controllers.Catalogs
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> Create([FromBody] CreateBrandDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -28,3 +30,4 @@ namespace EasyReach.Controllers.Catalogs
         }
     }
 }
+

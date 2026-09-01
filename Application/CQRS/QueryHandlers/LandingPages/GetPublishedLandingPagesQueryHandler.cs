@@ -25,7 +25,7 @@ public class GetPublishedLandingPagesQueryHandler(
                     request.PaginationParams,
                     predicate: p => p.IsPublished,
                     orderBy: q => q.OrderByDescending(p => p.CreatedAt),
-                    includeProperties: "Products"
+                    includeProperties: "LandingPageProducts.Product" // 🚀 'Products' এর জায়গায় 'LandingPageProducts.Product' করা হলো
                 );
 
                 var mappedItems = mapper.Map<List<LandingPageResponseDto>>(pagedPages.Items);

@@ -1,7 +1,9 @@
 ﻿using EasyReach.Middlewares;
 using EasyReach_Application.DependencyInjections;
 using EasyReach_Infrastructure.DependencyInjections;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
+using System.Text.Json;
 
 namespace EasyReach
 {
@@ -22,7 +24,7 @@ namespace EasyReach
             builder.Services.AddControllers();
             builder.Services.AddOpenApi();
 
-            // 2. Add Swagger/Endpoints API Explorer with JWT Support
+            // 2. Add Swagger/Endpoints API Explorer with Automatic Bearer JWT Support
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(c =>
             {
@@ -32,15 +34,15 @@ namespace EasyReach
                     Version = "v1"
                 });
 
-                // 🔐 Swagger UI-তে Authorize বাটন যোগ করা
+                // 🔐 Swagger UI-তে শুধু টোকেন দিলেই হবে, Bearer অটোমেটিক যোগ করার জন্য SecuritySchemeType.Http ব্যবহার করা হলো
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
                     Name = "Authorization",
-                    Type = SecuritySchemeType.ApiKey,
-                    Scheme = "Bearer",
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "bearer",
                     BearerFormat = "JWT",
                     In = ParameterLocation.Header,
-                    Description = "Enter 'Bearer' [space] and then your valid token in the text input below.\r\n\r\nExample: \"Bearer eyJhbGciOiJIUzI1Ni...\""
+                    Description = "Enter your valid JWT token below. (No need to type 'Bearer', it will be added automatically)"
                 });
 
                 c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -62,6 +64,43 @@ namespace EasyReach
             // 3. Register Custom Application & Infrastructure DI Extensions 
             builder.Services.AddApplicationServices();
             builder.Services.AddInfrastructureServices(builder.Configuration);
+
+            // 🔐 JWT Bearer Authentication-এর জন্য ইউজার-ফ্রেন্ডলি 401 & 403 Response Events কাস্টমাইজেশন
+            builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+            {
+                options.Events ??= new JwtBearerEvents();
+
+                // 401 Unauthorized (টোকেন না দিলে বা ইনভ্যালিড টোকেন দিলে)
+                options.Events.OnChallenge = context =>
+                {
+                    context.HandleResponse();
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    context.Response.ContentType = "application/json";
+
+                    var response = new
+                    {
+                        success = false,
+                        message = "You are not authorized to access this resource. Please provide a valid JWT Token or Login first."
+                    };
+
+                    return context.Response.WriteAsync(JsonSerializer.Serialize(response));
+                };
+
+                // 403 Forbidden (অ্যাডমিন না হয়ে অ্যাডমিন এপিআইতে হিট করলে)
+                options.Events.OnForbidden = context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    context.Response.ContentType = "application/json";
+
+                    var response = new
+                    {
+                        success = false,
+                        message = "Access denied. You do not have permission (Admin role) to perform this action."
+                    };
+
+                    return context.Response.WriteAsync(JsonSerializer.Serialize(response));
+                };
+            });
 
             var app = builder.Build();
 
@@ -98,3 +137,4 @@ namespace EasyReach
         }
     }
 }
+
