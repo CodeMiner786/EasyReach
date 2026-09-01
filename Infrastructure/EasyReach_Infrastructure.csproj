@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+
+		<!-- 🔐 JWT Authentication Package -->
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+
+		<!-- AddHttpClient এবং External API (SSLCommerz, Steadfast, SSL Wireless) এর জন্য প্যাকেজ -->
+		<PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+
+		<!-- BCrypt Password Hashing এর জন্য প্যাকেজ -->
+		<PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.0" />
+
+		<!-- 🌟 Redis Core Library -->
+		<PackageReference Include="StackExchange.Redis" Version="2.8.24" />
+		<!-- 🌟 .NET Distributed Cache Adapter for Redis (AddStackExchangeRedisCache এর জন্য প্রয়োজনীয়) -->
+		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
+
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Application\EasyReach_Application.csproj" />
+		<ProjectReference Include="..\Domain\EasyReach_Domain.csproj" />
+	</ItemGroup>
+</Project>

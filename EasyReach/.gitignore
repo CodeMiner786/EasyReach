@@ -1,0 +1,43 @@
+﻿# Build directories
+bin/
+obj/
+
+# Visual Studio files
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.ncb
+*.swp
+
+# Publish output
+wwwroot/
+
+# NuGet packages
+*.nupkg
+*.snupkg
+packages/
+*.nuspec
+
+# Resharper / Rider
+_ReSharper*/
+*.DotSettings.user
+
+# Test results
+TestResult*/
+*.trx
+*.coverage
+*.coveragexml
+
+# Others
+*.dbmdl
+*.jfm

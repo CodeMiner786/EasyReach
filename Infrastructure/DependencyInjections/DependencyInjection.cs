@@ -1,0 +1,215 @@
+﻿using EasyReach_Application.CourierService;
+using EasyReach_Application.Emails;
+using EasyReach_Application.Interfaces;
+using EasyReach_Application.Interfaces.Repositories;
+using EasyReach_Application.Interfaces.Repositories.HashPasswords;
+using EasyReach_Application.Interfaces.Repositories.LandingPages;
+using EasyReach_Application.Interfaces.UnitOfWorks;
+using EasyReach_Application.IRedis;
+using EasyReach_Application.ISslCommerzServices;
+using EasyReach_Application.SSLWireless;
+using EasyReach_Infrastructure.CourierServices;
+using EasyReach_Infrastructure.Emails;
+using EasyReach_Infrastructure.Emails.BackgroundWorkers;
+using EasyReach_Infrastructure.Emails.SMTP;
+using EasyReach_Infrastructure.Persistence;
+using EasyReach_Infrastructure.Persistence.Seeders;
+using EasyReach_Infrastructure.Redis;
+using EasyReach_Infrastructure.Repositories;
+using EasyReach_Infrastructure.Repositories.HashPasswords;
+using EasyReach_Infrastructure.Repositories.LandingPages;
+using EasyReach_Infrastructure.Repositories.UnitOfWorks;
+using EasyReach_Infrastructure.SslCommerzServices;
+using EasyReach_Infrastructure.SSLWirelessSMS;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
+using StackExchange.Redis;
+using System.Reflection;
+using System.Text;
+
+namespace EasyReach_Infrastructure.DependencyInjections
+{
+    public static class DependencyInjection
+    {
+        public static IServiceCollection AddInfrastructureServices(
+            this IServiceCollection services,
+            IConfiguration configuration)
+        {
+            // =========================================================
+            // 🔐 0. JWT AUTHENTICATION & AUTHORIZATION SETTINGS
+            // =========================================================
+            var jwtSettings = configuration.GetSection("JwtSettings");
+            var secretKey = jwtSettings["Secret"] ?? "EasyReachSuperSecretKey1234567890!@#$";
+
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.SaveToken = true;
+                options.RequireHttpsMetadata = false;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtSettings["Issuer"] ?? "EasyReach",
+                    ValidAudience = jwtSettings["Audience"] ?? "EasyReachUsers",
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                    ClockSkew = TimeSpan.Zero
+                };
+            });
+
+            services.AddAuthorization();
+
+            // =========================================================
+            // 🗄️ 1. DATABASE CONTEXT SETTINGS
+            // =========================================================
+            services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlServer(
+                    configuration.GetConnectionString("DefaultConnection"),
+                    b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+
+            // =========================================================
+            // 🔴 REDIS CACHE SETTINGS
+            // =========================================================
+            // ক. Redis ConnectionMultiplexer (Singleton)
+            services.AddSingleton<IConnectionMultiplexer>(sp =>
+                ConnectionMultiplexer.Connect(configuration.GetConnectionString("Redis") ?? "localhost:6379"));
+
+            // খ. IDistributedCache Setup (StackExchange Redis Layer)
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = configuration.GetConnectionString("Redis") ?? "localhost:6379";
+                options.InstanceName = "EasyReach_"; // Redis Key Prefix
+            });
+
+            // Manual Registration for Promotions & Landing Page Repositories
+            services.AddScoped<IDiscountRepository, DiscountRepository>();
+            services.AddScoped<IComboRepository, ComboRepository>();
+            services.AddScoped<ILandingPageRepository, LandingPageRepository>();
+
+            // গ. Custom Redis Services Registration (Scoped)
+            services.AddScoped<ICacheService, RedisCacheService>();
+            services.AddScoped<ICacheLockManager, CacheLockManager>();
+            services.AddScoped<IRateLimiter, RateLimiter>();
+            services.AddScoped<ICacheHelper, CacheHelper>();
+
+            // =========================================================
+            // 📂 2. UNIT OF WORK & REPOSITORY REGISTRATION
+            // =========================================================
+            // ⭐️ UnitOfWork Registration (Scoped)
+            services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+            // Generic Repository Registration
+            services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+
+            var infrastructureAssembly = Assembly.GetExecutingAssembly();
+
+            // 🚀 AUTOMATIC REPOSITORY REGISTRATION
+            var repositoryTypes = infrastructureAssembly.GetTypes()
+                .Where(t => t.IsClass && !t.IsAbstract && t.Name.EndsWith("Repository"));
+
+            foreach (var implementationType in repositoryTypes)
+            {
+                var interfaceType = implementationType.GetInterfaces()
+                    .FirstOrDefault(i => i.Name == $"I{implementationType.Name}");
+
+                if (interfaceType != null)
+                {
+                    services.AddScoped(interfaceType, implementationType);
+                }
+            }
+
+            // =========================================================
+            // 🔑 3. PASSWORD HASHER & CORE SERVICES REGISTRATION
+            // =========================================================
+            services.AddScoped<IPasswordHasher, PasswordHasher>();
+
+            // 🚀 AUTOMATIC SERVICE REGISTRATION
+            var serviceTypes = infrastructureAssembly.GetTypes()
+                .Where(t => t.IsClass && !t.IsAbstract && t.Name.EndsWith("Service"));
+
+            foreach (var implementationType in serviceTypes)
+            {
+                var interfaceType = implementationType.GetInterfaces()
+                    .FirstOrDefault(i => i.Name == $"I{implementationType.Name}");
+
+                // Http client, SMS এবং Redis সার্ভিসগুলো অটো রেজিস্টার স্কিপ করবে (যেহেতু এগুলো ম্যানুয়ালি রেজিস্টার করা হয়েছে)
+                if (interfaceType != null &&
+                    interfaceType != typeof(ISslCommerzService) &&
+                    interfaceType != typeof(ICourierService) &&
+                    interfaceType != typeof(ICacheService) &&
+                    interfaceType != typeof(ISmsService))
+                {
+                    services.AddScoped(interfaceType, implementationType);
+                }
+            }
+
+            // =========================================================
+            // 🌐 4. EXTERNAL HTTP SERVICES (SSLCommerz & Steadfast Courier)
+            // =========================================================
+            services.AddHttpClient<ISslCommerzService, SslCommerzService>();
+            services.AddHttpClient<ICourierService, SteadfastCourierService>();
+
+            // Email Settings Configuration
+            services.Configure<EmailSettings>(configuration.GetSection("EmailSettings"));
+            services.AddScoped<IEmailService, EmailService>();
+
+            // Background Queue & Worker Registration
+            services.AddSingleton<INotificationQueue, NotificationQueue>();
+            services.AddHostedService<NotificationBackgroundWorker>();
+
+            // =========================================================
+            // 📱 5. SSL WIRELESS SMS SERVICE REGISTRATION
+            // =========================================================
+            services.Configure<SslWirelessSettings>(configuration.GetSection("SslWireless"));
+
+            var sslEnabled = configuration.GetValue<bool>("SslWireless:Enabled");
+            if (sslEnabled)
+            {
+                services.AddScoped<ISmsService, SslWirelessSmsService>();
+            }
+            else
+            {
+                services.AddScoped<ISmsService, NoOpSmsService>();
+            }
+
+            return services;
+        }
+
+        // =========================================================
+        // 🚀 DATABASE SEEDER EXTENSION METHOD
+        // =========================================================
+        public static async Task<IApplicationBuilder> SeedDatabaseAsync(this IApplicationBuilder app)
+        {
+            using var scope = app.ApplicationServices.CreateScope();
+            var services = scope.ServiceProvider;
+
+            try
+            {
+                var context = services.GetRequiredService<ApplicationDbContext>();
+                var passwordHasher = services.GetRequiredService<IPasswordHasher>();
+
+                await DataSeeder.SeedAsync(context, passwordHasher);
+            }
+            catch (Exception ex)
+            {
+                var logger = services.GetRequiredService<ILogger<ApplicationDbContext>>();
+                logger.LogError(ex, "An error occurred while seeding the database.");
+            }
+
+            return app;
+        }
+    }
+}
+
