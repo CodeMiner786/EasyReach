@@ -1,6 +1,7 @@
 ﻿using EasyReach.Middlewares;
 using EasyReach_Application.DependencyInjections;
 using EasyReach_Infrastructure.DependencyInjections;
+using Microsoft.OpenApi.Models;
 
 namespace EasyReach
 {
@@ -21,9 +22,42 @@ namespace EasyReach
             builder.Services.AddControllers();
             builder.Services.AddOpenApi();
 
-            // 2. Add Swagger/Endpoints API Explorer
+            // 2. Add Swagger/Endpoints API Explorer with JWT Support
             builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
+            builder.Services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Title = "EasyReach API",
+                    Version = "v1"
+                });
+
+                // 🔐 Swagger UI-তে Authorize বাটন যোগ করা
+                c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.ApiKey,
+                    Scheme = "Bearer",
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Description = "Enter 'Bearer' [space] and then your valid token in the text input below.\r\n\r\nExample: \"Bearer eyJhbGciOiJIUzI1Ni...\""
+                });
+
+                c.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        Array.Empty<string>()
+                    }
+                });
+            });
 
             // 3. Register Custom Application & Infrastructure DI Extensions 
             builder.Services.AddApplicationServices();
@@ -64,4 +98,3 @@ namespace EasyReach
         }
     }
 }
-
