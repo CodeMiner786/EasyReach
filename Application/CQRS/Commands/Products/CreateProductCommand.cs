@@ -8,5 +8,10 @@ using System.Threading.Tasks;
 
 namespace EasyReach_Application.CQRS.Commands.Products
 {
-    public record CreateProductCommand(CreateProductDto Dto, Guid UserId) : IRequest<ProductDto>;
+    public record CreateProductCommand(
+    CreateProductDto Dto,
+    Stream? ImageStream = null,
+    string? ImageFileName = null,
+    string? ImageContentType = null
+) : IRequest<ProductDto>;
 }

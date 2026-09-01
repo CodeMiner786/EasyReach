@@ -4,7 +4,10 @@ using EasyReach_Application.CQRS.Querys.Products;
 using EasyReach_Application.CQRS.Querys.ProductVariants;
 using EasyReach_Application.DTOs.Catalogs;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace EasyReach.Controllers.Catalogs
 {
@@ -23,18 +26,32 @@ namespace EasyReach.Controllers.Catalogs
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateProductDto dto)
+        [Authorize(Roles = "Admin,SuperAdmin")] // 🔐 শুধু Admin/SuperAdmin প্রোডাক্ট ক্রিয়েট করতে পারবে
+        public async Task<IActionResult> Create([FromForm] CreateProductDto dto, IFormFile? imageFile)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            // TODO: Extract actual logged-in user ID from Claims in real environment
-            var userId = Guid.NewGuid();
+            Stream? stream = null;
+            string? fileName = null;
+            string? contentType = null;
 
-            var result = await mediator.Send(new CreateProductCommand(dto, userId));
-            return Ok(result);
+            // 📷 ফাইল আপলোড করা থাকলে Stream তৈরি
+            if (imageFile != null)
+            {
+                stream = imageFile.OpenReadStream();
+                fileName = imageFile.FileName;
+                contentType = imageFile.ContentType;
+            }
+
+            // 🚀 Command-এ Dto এবং Image Data পাস করা হচ্ছে
+            var command = new CreateProductCommand(dto, stream, fileName, contentType);
+            var result = await mediator.Send(command);
+
+            return Ok(new { Success = true, Message = "Product created successfully.", Data = result });
         }
 
         [HttpPost("variants")]
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> CreateVariant([FromBody] CreateProductVariantDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -48,6 +65,15 @@ namespace EasyReach.Controllers.Catalogs
         {
             var result = await mediator.Send(new GetVariantsByProductIdQuery(productId));
             return Ok(result);
+        }
+
+        // 🔐 টোকেন থেকে Logged-in User-এর ID নেওয়ার প্রাইভেট হেলপার
+        private Guid GetUserId()
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                         ?? User.FindFirstValue("sub");
+
+            return Guid.TryParse(userIdStr, out var userId) ? userId : Guid.Empty;
         }
     }
 }
