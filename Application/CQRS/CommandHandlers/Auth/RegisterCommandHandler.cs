@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using EasyReach_Application.CQRS.Commands.Auth;
 using EasyReach_Application.DTOs.Identities.Auth;
+using EasyReach_Application.Interfaces.JWT;
 using EasyReach_Application.Interfaces.Repositories;
 using EasyReach_Application.Interfaces.Repositories.HashPasswords;
 using EasyReach_Domain.Entities.Identities;
@@ -12,7 +13,8 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Auth
     public class RegisterCommandHandler(
         IApplicationUserRepository userRepository,
         IPasswordHasher passwordHasher,
-        IMapper mapper) : IRequestHandler<RegisterCommand, LoginResponseDto>
+        IMapper mapper,
+        IJwtTokenGenerator jwtTokenGenerator) : IRequestHandler<RegisterCommand, LoginResponseDto>
     {
         public async Task<LoginResponseDto> Handle(RegisterCommand request, CancellationToken cancellationToken)
         {
@@ -30,14 +32,17 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Auth
             await userRepository.AddAsync(user);
             await userRepository.SaveChangesAsync();
 
+            // 🚀 Dynamic JWT Generation
+            var (accessToken, expiresAt) = jwtTokenGenerator.GenerateToken(user);
+
             return new LoginResponseDto
             {
                 UserId = user.Id,
                 FullName = user.FullName,
                 Email = user.Email,
                 UserType = user.UserType,
-                AccessToken = "SAMPLE_ACCESS_TOKEN",
-                AccessTokenExpiresAt = DateTime.UtcNow.AddHours(2),
+                AccessToken = accessToken,
+                AccessTokenExpiresAt = expiresAt,
                 RefreshToken = "SAMPLE_REFRESH_TOKEN"
             };
         }
@@ -46,7 +51,8 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Auth
     public class LoginCommandHandler(
         IApplicationUserRepository userRepository,
         IRefreshTokenRepository refreshTokenRepository,
-        IPasswordHasher passwordHasher) : IRequestHandler<LoginCommand, LoginResponseDto>
+        IPasswordHasher passwordHasher,
+        IJwtTokenGenerator jwtTokenGenerator) : IRequestHandler<LoginCommand, LoginResponseDto>
     {
         public async Task<LoginResponseDto> Handle(LoginCommand request, CancellationToken cancellationToken)
         {
@@ -61,6 +67,9 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Auth
 
             user.LastLoginAt = DateTime.UtcNow;
             userRepository.Update(user);
+
+            // 🚀 Dynamic JWT Generation
+            var (accessToken, expiresAt) = jwtTokenGenerator.GenerateToken(user);
 
             var refreshToken = new RefreshToken
             {
@@ -79,15 +88,17 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Auth
                 FullName = user.FullName,
                 Email = user.Email,
                 UserType = user.UserType,
-                AccessToken = "JWT_ACCESS_TOKEN",
-                AccessTokenExpiresAt = DateTime.UtcNow.AddHours(2),
+                AccessToken = accessToken,
+                AccessTokenExpiresAt = expiresAt,
                 RefreshToken = refreshToken.Token
             };
         }
     }
 
     public class RefreshTokenCommandHandler(
-        IRefreshTokenRepository refreshTokenRepository) : IRequestHandler<RefreshTokenCommand, RefreshTokenResponseDto>
+        IRefreshTokenRepository refreshTokenRepository,
+        IApplicationUserRepository userRepository,
+        IJwtTokenGenerator jwtTokenGenerator) : IRequestHandler<RefreshTokenCommand, RefreshTokenResponseDto>
     {
         public async Task<RefreshTokenResponseDto> Handle(RefreshTokenCommand request, CancellationToken cancellationToken)
         {
@@ -96,6 +107,9 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Auth
 
             if (existingToken.IsRevoked || existingToken.ExpiresAt <= DateTime.UtcNow)
                 throw new InvalidOperationException("Expired or Revoked Refresh Token.");
+
+            var user = await userRepository.GetByIdAsync(existingToken.UserId)
+                ?? throw new InvalidOperationException("User not found.");
 
             existingToken.IsRevoked = true;
             existingToken.RevokedAt = DateTime.UtcNow;
@@ -115,10 +129,13 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Auth
             await refreshTokenRepository.AddAsync(newRefreshToken);
             await refreshTokenRepository.SaveChangesAsync();
 
+            // 🚀 Dynamic JWT Generation
+            var (accessToken, expiresAt) = jwtTokenGenerator.GenerateToken(user);
+
             return new RefreshTokenResponseDto
             {
-                AccessToken = "NEW_JWT_ACCESS_TOKEN",
-                AccessTokenExpiresAt = DateTime.UtcNow.AddHours(2),
+                AccessToken = accessToken,
+                AccessTokenExpiresAt = expiresAt,
                 RefreshToken = newRefreshTokenStr
             };
         }
@@ -175,3 +192,4 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Auth
         }
     }
 }
+

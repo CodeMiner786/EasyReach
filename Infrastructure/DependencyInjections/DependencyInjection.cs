@@ -1,6 +1,8 @@
 ﻿using EasyReach_Application.CourierService;
 using EasyReach_Application.Emails;
 using EasyReach_Application.Interfaces;
+using EasyReach_Application.Interfaces.CurrentUsers;
+using EasyReach_Application.Interfaces.JWT;
 using EasyReach_Application.Interfaces.Repositories;
 using EasyReach_Application.Interfaces.Repositories.HashPasswords;
 using EasyReach_Application.Interfaces.Repositories.LandingPages;
@@ -16,7 +18,9 @@ using EasyReach_Infrastructure.Persistence;
 using EasyReach_Infrastructure.Persistence.Seeders;
 using EasyReach_Infrastructure.Redis;
 using EasyReach_Infrastructure.Repositories;
+using EasyReach_Infrastructure.Repositories.CurrentUsers;
 using EasyReach_Infrastructure.Repositories.HashPasswords;
+using EasyReach_Infrastructure.Repositories.JWT;
 using EasyReach_Infrastructure.Repositories.LandingPages;
 using EasyReach_Infrastructure.Repositories.UnitOfWorks;
 using EasyReach_Infrastructure.SslCommerzServices;
@@ -70,6 +74,13 @@ namespace EasyReach_Infrastructure.DependencyInjections
             });
 
             services.AddAuthorization();
+
+            // 🚀 Dynamic JWT Token Generator Service Registration
+            services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+
+            // Current User Service Registration
+            services.AddHttpContextAccessor();
+            services.AddScoped<ICurrentUserService, CurrentUserService>();
 
             // =========================================================
             // 🗄️ 1. DATABASE CONTEXT SETTINGS

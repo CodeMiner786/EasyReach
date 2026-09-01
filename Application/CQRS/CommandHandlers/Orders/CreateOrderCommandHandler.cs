@@ -4,6 +4,8 @@ using EasyReach_Application.CQRS.Commands.Orders;
 using EasyReach_Application.DTOs.Couriers;
 using EasyReach_Application.DTOs.Orders;
 using EasyReach_Application.Emails;
+using EasyReach_Application.Interfaces;
+using EasyReach_Application.Interfaces.CurrentUsers;
 using EasyReach_Application.Interfaces.Repositories;
 using EasyReach_Application.IRedis;
 using EasyReach_Application.NotificationMessages;
@@ -28,6 +30,7 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Orders
         IMapper mapper,
         ICacheHelper cacheHelper,
         INotificationQueue notificationQueue,
+        ICurrentUserService currentUserService,
         ILogger<CreateOrderCommandHandler> logger) : IRequestHandler<CreateOrderCommand, CreateOrderResponseDto>
     {
         private static readonly Regex BangladeshPhoneRegex = new(@"^01[3-9]\d{8}$", RegexOptions.Compiled);
@@ -36,6 +39,10 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Orders
             CreateOrderCommand request,
             CancellationToken cancellationToken)
         {
+            // 🚀 JWT টোকেন থেকে বর্তমান অথেনটিকেটেড ইউজারের আইডি নেওয়া
+            var userId = currentUserService.UserId
+                ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
             // ১. ১১ ডিজিটের Bangladesh ফোন নম্বর ভ্যালিডেশন
             if (!BangladeshPhoneRegex.IsMatch(request.ShippingAddress.Phone))
             {
@@ -44,7 +51,7 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Orders
 
             // ২. ২৪ ঘণ্টায় ১টি অর্ডার লিমিট চেক
             bool hasRecentOrder = await orderRepository.HasOrderInLast24HoursAsync(
-                request.UserId,
+                userId,
                 request.ShippingAddress.Phone);
 
             if (hasRecentOrder)
@@ -67,6 +74,7 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Orders
 
             // ৬. Order Entity তৈরি
             var order = mapper.Map<Order>(request);
+            order.UserId = userId; // JWT থেকে পাওয়া UserId অ্যাসাইন করা হলো
             order.OrderNumber = $"ORD-{DateTime.UtcNow:yyyyMMdd}-{Random.Shared.Next(1000, 9999)}";
             order.ShippingAddressId = address.Id;
             order.SubTotal = subTotal;
@@ -88,13 +96,13 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Orders
             await orderRepository.SaveChangesAsync();
 
             // 🚀 ৭. অর্ডার সফল হলে ইউজারের কার্ট ক্লিন ও ক্যাশ ইনভ্যালিডেশন
-            var userCartList = await cartRepository.FindAsync(c => c.UserId == request.UserId);
+            var userCartList = await cartRepository.FindAsync(c => c.UserId == userId);
             var userCart = userCartList.FirstOrDefault();
             if (userCart is not null)
             {
                 cartRepository.Remove(userCart);
                 await cartRepository.SaveChangesAsync();
-                await cacheHelper.RemoveAsync($"cart:{request.UserId}");
+                await cacheHelper.RemoveAsync($"cart:{userId}");
             }
 
             // 🚀 ৮. In-Memory Queue-তে background SMS এবং Email push

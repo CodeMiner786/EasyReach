@@ -53,6 +53,9 @@ namespace EasyReach
 
             app.UseHttpsRedirection();
 
+            // 🔐 6. Authentication Middleware (Authorization এর আগে অবশ্যই থাকতে হবে)
+            app.UseAuthentication();
+
             app.UseAuthorization();
 
             app.MapControllers();
@@ -61,3 +64,4 @@ namespace EasyReach
         }
     }
 }
+
