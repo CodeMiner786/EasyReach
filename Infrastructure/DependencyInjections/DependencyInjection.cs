@@ -1,5 +1,6 @@
 ﻿using EasyReach_Application.CourierService;
 using EasyReach_Application.Emails;
+using EasyReach_Application.Files;
 using EasyReach_Application.Interfaces;
 using EasyReach_Application.Interfaces.CurrentUsers;
 using EasyReach_Application.Interfaces.JWT;
@@ -14,6 +15,7 @@ using EasyReach_Infrastructure.CourierServices;
 using EasyReach_Infrastructure.Emails;
 using EasyReach_Infrastructure.Emails.BackgroundWorkers;
 using EasyReach_Infrastructure.Emails.SMTP;
+using EasyReach_Infrastructure.Files;
 using EasyReach_Infrastructure.Persistence;
 using EasyReach_Infrastructure.Persistence.Seeders;
 using EasyReach_Infrastructure.Redis;
@@ -77,6 +79,9 @@ namespace EasyReach_Infrastructure.DependencyInjections
 
             // 🚀 Dynamic JWT Token Generator Service Registration
             services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+
+            // File handler Registration 
+            services.AddScoped<IFileStorageService, LocalFileStorageService>();
 
             // Current User Service Registration
             services.AddHttpContextAccessor();

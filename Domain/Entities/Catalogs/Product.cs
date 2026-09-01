@@ -1,14 +1,11 @@
-using EasyReach_Domain.Common;
-using EasyReach_Domain.Enums;
+﻿using EasyReach_Domain.Common;
 
 namespace EasyReach_Domain.Entities.Catalogs
 {
-
-    // Main Product entity. Actual price/stock ProductVariant e thake
-    // (jehetu ekta product er multiple size/weight thakte pare - 500g, 1kg).
-
     public class Product : AuditableEntity
     {
+        // ❌ public Guid Id { get; set; } বাদ দেওয়া হলো, কারণ এটি AuditableEntity থেকে ইনহেরিট হয়।
+
         public string Name { get; set; } = string.Empty;
         public string Slug { get; set; } = string.Empty;
         public string? ShortDescription { get; set; }
@@ -16,21 +13,18 @@ namespace EasyReach_Domain.Entities.Catalogs
         public string SKU { get; set; } = string.Empty;
 
         public Guid CategoryId { get; set; }
-        public Category Category { get; set; } = null!;
+        public virtual Category Category { get; set; } = null!;
 
         public Guid? BrandId { get; set; }
-        public Brand? Brand { get; set; }
+        public virtual Brand? Brand { get; set; }
 
-        public ProductStatus Status { get; set; } = ProductStatus.Draft;
-
+        public int Status { get; set; }
         public bool IsFeatured { get; set; }
         public bool IsBestSelling { get; set; }
         public bool IsNewArrival { get; set; }
 
-        // Kon manager/admin ei product ta upload korlo
-        public new Guid CreatedByUserId { get; set; }
-
-        public ICollection<ProductVariant> Variants { get; set; } = [];
-        public ICollection<ProductImage> Images { get; set; } = [];
+        public virtual ICollection<ProductVariant> Variants { get; set; } = [];
+        public virtual ICollection<ProductImage> Images { get; set; } = [];
     }
 }
+

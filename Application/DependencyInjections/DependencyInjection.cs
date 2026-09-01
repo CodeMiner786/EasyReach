@@ -1,4 +1,5 @@
-﻿using FluentValidation;
+﻿using EasyReach_Application.Files;
+using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -23,6 +24,8 @@ namespace EasyReach_Application.DependencyInjections
 
             // ৩. MediatR Registration (CQRS Commands/Queries/Handlers পাবে)
             services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
+
+            
 
             return services;
         }

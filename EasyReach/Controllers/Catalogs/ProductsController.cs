@@ -7,7 +7,12 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Security.Claims;
+using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace EasyReach.Controllers.Catalogs
 {
@@ -26,16 +31,50 @@ namespace EasyReach.Controllers.Catalogs
         }
 
         [HttpPost]
-        [Authorize(Roles = "Admin,SuperAdmin")] // 🔐 শুধু Admin/SuperAdmin প্রোডাক্ট ক্রিয়েট করতে পারবে
+        [Authorize(Roles = "Admin,SuperAdmin")]
         public async Task<IActionResult> Create([FromForm] CreateProductDto dto, IFormFile? imageFile)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            if (Request.Form.TryGetValue("variantsJson", out var variantsJsonValues))
+            {
+                var combinedList = new List<CreateProductVariantDto>();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+                foreach (var jsonItem in variantsJsonValues)
+                {
+                    if (string.IsNullOrWhiteSpace(jsonItem)) continue;
+
+                    try
+                    {
+                        var trimmed = jsonItem.Trim();
+                        if (trimmed.StartsWith('['))
+                        {
+                            var list = JsonSerializer.Deserialize<List<CreateProductVariantDto>>(trimmed, options);
+                            if (list != null) combinedList.AddRange(list);
+                        }
+                        else if (trimmed.StartsWith('{'))
+                        {
+                            var single = JsonSerializer.Deserialize<CreateProductVariantDto>(trimmed, options);
+                            if (single != null) combinedList.Add(single);
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore individual parse error if any formatting mismatch occurs
+                    }
+                }
+
+                if (combinedList.Count > 0)
+                {
+                    dto.Variants = combinedList;
+                }
+            }
 
             Stream? stream = null;
             string? fileName = null;
             string? contentType = null;
 
-            // 📷 ফাইল আপলোড করা থাকলে Stream তৈরি
             if (imageFile != null)
             {
                 stream = imageFile.OpenReadStream();
@@ -43,8 +82,7 @@ namespace EasyReach.Controllers.Catalogs
                 contentType = imageFile.ContentType;
             }
 
-            // 🚀 Command-এ Dto এবং Image Data পাস করা হচ্ছে
-            var command = new CreateProductCommand(dto, stream, fileName, contentType);
+            var command = new CreateProductCommand(dto, GetUserId(), stream, fileName, contentType);
             var result = await mediator.Send(command);
 
             return Ok(new { Success = true, Message = "Product created successfully.", Data = result });
@@ -67,7 +105,6 @@ namespace EasyReach.Controllers.Catalogs
             return Ok(result);
         }
 
-        // 🔐 টোকেন থেকে Logged-in User-এর ID নেওয়ার প্রাইভেট হেলপার
         private Guid GetUserId()
         {
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -77,3 +114,4 @@ namespace EasyReach.Controllers.Catalogs
         }
     }
 }
+

@@ -9,9 +9,10 @@ using System.Threading.Tasks;
 namespace EasyReach_Application.CQRS.Commands.Products
 {
     public record CreateProductCommand(
-    CreateProductDto Dto,
-    Stream? ImageStream = null,
-    string? ImageFileName = null,
-    string? ImageContentType = null
-) : IRequest<ProductDto>;
+         CreateProductDto Dto,
+         Guid CreatedByUserId,
+         Stream? ImageStream = null,
+         string? ImageFileName = null,
+         string? ImageContentType = null
+     ) : IRequest<ProductDto>;
 }

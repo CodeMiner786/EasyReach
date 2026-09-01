@@ -26,20 +26,20 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Products
             string uniqueSlug = baseSlug;
             int counter = 1;
 
-            // ২. ডুপ্লিকেট স্লগ প্রতিরোধ করতে চেক
             while (await productRepository.ExistsAsync(p => p.Slug == uniqueSlug))
             {
                 uniqueSlug = $"{baseSlug}-{counter}";
                 counter++;
             }
 
-            // ৩. Entity mapping এবং Base/Slug অ্যাসাইন
+            // ২. Entity mapping এবং Base/Slug অ্যাসাইন
             var productEntity = mapper.Map<Product>(request.Dto);
             productEntity.Id = Guid.NewGuid();
             productEntity.Slug = uniqueSlug;
             productEntity.CreatedAt = DateTime.UtcNow;
+            productEntity.CreatedByUserId = request.CreatedByUserId;
 
-            // 📷 ৪. ছবি সেভ করে Images Collection-এ যুক্ত করা
+            // 📷 ৩. ছবি আপলোড হ্যান্ডলিং
             if (request.ImageStream != null && !string.IsNullOrEmpty(request.ImageFileName))
             {
                 var imageUrl = await fileStorageService.UploadAsync(
@@ -50,7 +50,6 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Products
                     cancellationToken
                 );
 
-                // ProductImage কালেকশনে যোগ
                 productEntity.Images.Add(new ProductImage
                 {
                     Id = Guid.NewGuid(),
@@ -60,6 +59,20 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Products
                     DisplayOrder = 1,
                     CreatedAt = DateTime.UtcNow
                 });
+            }
+
+            // 📦 ৪. Nested Variants হ্যান্ডলিং (যদি রিকোয়েস্টে ভ্যারিয়েন্ট পাঠানো হয়)
+            if (request.Dto.Variants != null && request.Dto.Variants.Count > 0)
+            {
+                foreach (var variantDto in request.Dto.Variants)
+                {
+                    var variantEntity = mapper.Map<ProductVariant>(variantDto);
+                    variantEntity.Id = Guid.NewGuid();
+                    variantEntity.ProductId = productEntity.Id; // অটো-লিঙ্ক করা হলো
+                    variantEntity.CreatedAt = DateTime.UtcNow;
+
+                    productEntity.Variants.Add(variantEntity);
+                }
             }
 
             // ৫. ডাটাবেজে সেভ
@@ -73,4 +86,3 @@ namespace EasyReach_Application.CQRS.CommandHandlers.Products
         }
     }
 }
-

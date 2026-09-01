@@ -3,12 +3,9 @@ using EasyReach_Domain.Enums;
 
 namespace EasyReach_Application.DTOs.Catalogs
 {
-    /// <summary>
-    /// Notun ProductVariant create korar shomoy input hisebe ei DTO use hobe.
-    /// </summary>
     public class CreateProductVariantDto
     {
-        public Guid ProductId { get; set; }
+        public Guid? ProductId { get; set; }
 
         public string VariantName { get; set; } = string.Empty;
 

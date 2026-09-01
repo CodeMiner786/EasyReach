@@ -1,5 +1,4 @@
 ﻿using AutoMapper;
-using EasyReach_Application.CQRS.Commands.Products;
 using EasyReach_Application.CQRS.Commands.ProductVariants;
 using EasyReach_Application.DTOs.Catalogs;
 using EasyReach_Application.Exceptions;
@@ -21,15 +20,23 @@ namespace EasyReach_Application.CQRS.CommandHandlers.ProductVariants
     {
         public async Task<ProductVariantDto> Handle(CreateProductVariantCommand request, CancellationToken cancellationToken)
         {
-            // 🛑 ExistsAsync ব্যবহার করায় কোনো বাড়তি variable assign করতে হচ্ছে না
-            var parentProductExists = await productRepository.ExistsAsync(p => p.Id == request.Dto.ProductId);
+            if (!request.Dto.ProductId.HasValue || request.Dto.ProductId == Guid.Empty)
+            {
+                throw new Exception("ProductId is required for creating a standalone variant.");
+            }
+
+            // 🛑 .Value ব্যবহার করায় Guid? থেকে Guid কনভার্সন এরর সমাধান হলো
+            var productId = request.Dto.ProductId.Value;
+            var parentProductExists = await productRepository.ExistsAsync(p => p.Id == productId);
+
             if (!parentProductExists)
             {
-                throw new ProductNotFoundException(request.Dto.ProductId);
+                throw new ProductNotFoundException(productId);
             }
 
             var variantEntity = mapper.Map<ProductVariant>(request.Dto);
             variantEntity.Id = Guid.NewGuid();
+            variantEntity.ProductId = productId;
             variantEntity.CreatedAt = DateTime.UtcNow;
 
             await variantRepository.AddAsync(variantEntity);

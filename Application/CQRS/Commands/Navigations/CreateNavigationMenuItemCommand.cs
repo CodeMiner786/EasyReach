@@ -8,7 +8,10 @@ using System.Threading.Tasks;
 
 namespace EasyReach_Application.CQRS.Commands.Navigations
 {
-    public record CreateNavigationMenuItemCommand(CreateNavigationMenuItemDto Dto) : IRequest<NavigationMenuItemDto>;
+    public record CreateNavigationMenuItemCommand(
+        CreateNavigationMenuItemDto Dto,
+        Guid UserId
+    ) : IRequest<NavigationMenuItemDto>;
     public record UpdateNavigationMenuItemCommand(UpdateNavigationMenuItemDto Dto) : IRequest<NavigationMenuItemDto>;
     public record DeleteNavigationMenuItemCommand(Guid Id) : IRequest<bool>;
 }
