@@ -1,4 +1,5 @@
 ﻿using EasyReach_Application.Interfaces.Repositories;
+using EasyReach_Application.Interfaces.Repositories.Promotions;
 using EasyReach_Domain.Entities.Promotions;
 using EasyReach_Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;

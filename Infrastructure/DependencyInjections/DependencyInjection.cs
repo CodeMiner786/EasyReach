@@ -7,6 +7,7 @@ using EasyReach_Application.Interfaces.JWT;
 using EasyReach_Application.Interfaces.Repositories;
 using EasyReach_Application.Interfaces.Repositories.HashPasswords;
 using EasyReach_Application.Interfaces.Repositories.LandingPages;
+using EasyReach_Application.Interfaces.Repositories.Promotions;
 using EasyReach_Application.Interfaces.UnitOfWorks;
 using EasyReach_Application.IRedis;
 using EasyReach_Application.ISslCommerzServices;
@@ -98,21 +99,14 @@ namespace EasyReach_Infrastructure.DependencyInjections
             // =========================================================
             // 🔴 REDIS CACHE SETTINGS
             // =========================================================
-            // ক. Redis ConnectionMultiplexer (Singleton)
             services.AddSingleton<IConnectionMultiplexer>(sp =>
                 ConnectionMultiplexer.Connect(configuration.GetConnectionString("Redis") ?? "localhost:6379"));
 
-            // খ. IDistributedCache Setup (StackExchange Redis Layer)
             services.AddStackExchangeRedisCache(options =>
             {
                 options.Configuration = configuration.GetConnectionString("Redis") ?? "localhost:6379";
-                options.InstanceName = "EasyReach_"; // Redis Key Prefix
+                options.InstanceName = "EasyReach_";
             });
-
-            // Manual Registration for Promotions & Landing Page Repositories
-            services.AddScoped<IDiscountRepository, DiscountRepository>();
-            services.AddScoped<IComboRepository, ComboRepository>();
-            services.AddScoped<ILandingPageRepository, LandingPageRepository>();
 
             // গ. Custom Redis Services Registration (Scoped)
             services.AddScoped<ICacheService, RedisCacheService>();
@@ -123,15 +117,17 @@ namespace EasyReach_Infrastructure.DependencyInjections
             // =========================================================
             // 📂 2. UNIT OF WORK & REPOSITORY REGISTRATION
             // =========================================================
-            // ⭐️ UnitOfWork Registration (Scoped)
             services.AddScoped<IUnitOfWork, UnitOfWork>();
-
-            // Generic Repository Registration
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+
+            // Explicit Manual Registration for Custom Repositories (Corrected Namespace)
+            //services.AddScoped<IDiscountRepository, DiscountRepository>();
+            //services.AddScoped<IComboRepository, ComboRepository>();
+            //services.AddScoped<ILandingPageRepository, LandingPageRepository>();
 
             var infrastructureAssembly = Assembly.GetExecutingAssembly();
 
-            // 🚀 AUTOMATIC REPOSITORY REGISTRATION
+            // 🚀 AUTOMATIC REPOSITORY REGISTRATION (For remaining repositories)
             var repositoryTypes = infrastructureAssembly.GetTypes()
                 .Where(t => t.IsClass && !t.IsAbstract && t.Name.EndsWith("Repository"));
 
@@ -142,7 +138,11 @@ namespace EasyReach_Infrastructure.DependencyInjections
 
                 if (interfaceType != null)
                 {
-                    services.AddScoped(interfaceType, implementationType);
+                    // Avoid duplicate service descriptor registration exceptions
+                    if (!services.Any(s => s.ServiceType == interfaceType))
+                    {
+                        services.AddScoped(interfaceType, implementationType);
+                    }
                 }
             }
 
@@ -151,7 +151,6 @@ namespace EasyReach_Infrastructure.DependencyInjections
             // =========================================================
             services.AddScoped<IPasswordHasher, PasswordHasher>();
 
-            // 🚀 AUTOMATIC SERVICE REGISTRATION
             var serviceTypes = infrastructureAssembly.GetTypes()
                 .Where(t => t.IsClass && !t.IsAbstract && t.Name.EndsWith("Service"));
 
@@ -160,28 +159,28 @@ namespace EasyReach_Infrastructure.DependencyInjections
                 var interfaceType = implementationType.GetInterfaces()
                     .FirstOrDefault(i => i.Name == $"I{implementationType.Name}");
 
-                // Http client, SMS এবং Redis সার্ভিসগুলো অটো রেজিস্টার স্কিপ করবে (যেহেতু এগুলো ম্যানুয়ালি রেজিস্টার করা হয়েছে)
                 if (interfaceType != null &&
                     interfaceType != typeof(ISslCommerzService) &&
                     interfaceType != typeof(ICourierService) &&
                     interfaceType != typeof(ICacheService) &&
                     interfaceType != typeof(ISmsService))
                 {
-                    services.AddScoped(interfaceType, implementationType);
+                    if (!services.Any(s => s.ServiceType == interfaceType))
+                    {
+                        services.AddScoped(interfaceType, implementationType);
+                    }
                 }
             }
 
             // =========================================================
-            // 🌐 4. EXTERNAL HTTP SERVICES (SSLCommerz & Steadfast Courier)
+            // 🌐 4. EXTERNAL HTTP SERVICES
             // =========================================================
             services.AddHttpClient<ISslCommerzService, SslCommerzService>();
             services.AddHttpClient<ICourierService, SteadfastCourierService>();
 
-            // Email Settings Configuration
             services.Configure<EmailSettings>(configuration.GetSection("EmailSettings"));
             services.AddScoped<IEmailService, EmailService>();
 
-            // Background Queue & Worker Registration
             services.AddSingleton<INotificationQueue, NotificationQueue>();
             services.AddHostedService<NotificationBackgroundWorker>();
 
@@ -203,9 +202,6 @@ namespace EasyReach_Infrastructure.DependencyInjections
             return services;
         }
 
-        // =========================================================
-        // 🚀 DATABASE SEEDER EXTENSION METHOD
-        // =========================================================
         public static async Task<IApplicationBuilder> SeedDatabaseAsync(this IApplicationBuilder app)
         {
             using var scope = app.ApplicationServices.CreateScope();
@@ -228,4 +224,3 @@ namespace EasyReach_Infrastructure.DependencyInjections
         }
     }
 }
-

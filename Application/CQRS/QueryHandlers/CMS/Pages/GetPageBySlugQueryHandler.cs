@@ -11,12 +11,10 @@ namespace EasyReach_Application.CQRS.QueryHandlers.CMS.Pages
     {
         public async Task<PageDto?> Handle(GetPageBySlugQuery request, CancellationToken cancellationToken)
         {
-            // EF Core SQL query-তে সরাসরি '==' ব্যবহার করা সবচেয়ে দ্রুত এবং নির্ভরযোগ্য
-            var pages = await repository.FindAsync(p => p.Slug == request.Slug && p.IsPublished);
-            var page = pages.FirstOrDefault();
+            // রিলেটেড ব্যানার ও প্রোডাক্টসহ পেজ ফেচ করার কাস্টম রিপোজিটরি মেথড
+            var page = await repository.GetPageWithDetailsBySlugAsync(request.Slug);
 
             return page == null ? null : mapper.Map<PageDto>(page);
         }
     }
 }
-

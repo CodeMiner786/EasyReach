@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using EasyReach_Application.CQRS.Commands.Promotions;
+using EasyReach_Application.Interfaces.Repositories;
 using EasyReach_Application.Interfaces.Repositories.Promotions;
 using EasyReach_Application.IRedis;
 using EasyReach_Domain.Entities.Promotions;

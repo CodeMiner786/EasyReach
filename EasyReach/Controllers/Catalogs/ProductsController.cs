@@ -3,6 +3,7 @@ using EasyReach_Application.CQRS.Commands.ProductVariants;
 using EasyReach_Application.CQRS.Querys.Products;
 using EasyReach_Application.CQRS.Querys.ProductVariants;
 using EasyReach_Application.DTOs.Catalogs;
+using EasyReach_Domain.Common.Paginations;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -21,6 +22,14 @@ namespace EasyReach.Controllers.Catalogs
     [Tags("Products")]
     public class ProductsController(IMediator mediator) : ControllerBase
     {
+        [HttpGet]
+        public async Task<IActionResult> GetAll([FromQuery] PaginationParams paginationParams, [FromQuery] string? searchTerm)
+        {
+            var query = new GetProductsQuery(paginationParams, searchTerm);
+            var result = await mediator.Send(query);
+            return Ok(result);
+        }
+
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
         {
@@ -108,7 +117,7 @@ namespace EasyReach.Controllers.Catalogs
         private Guid GetUserId()
         {
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                         ?? User.FindFirstValue("sub");
+                       ?? User.FindFirstValue("sub");
 
             return Guid.TryParse(userIdStr, out var userId) ? userId : Guid.Empty;
         }

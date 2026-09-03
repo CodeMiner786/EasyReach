@@ -1,4 +1,4 @@
-using EasyReach_Domain.Common;
+﻿using EasyReach_Domain.Common;
 
 namespace EasyReach_Domain.Entities.CMSs
 {
@@ -8,5 +8,8 @@ namespace EasyReach_Domain.Entities.CMSs
         public string Slug { get; set; } = string.Empty;
         public string Content { get; set; } = string.Empty;
         public bool IsPublished { get; set; } = true;
+
+        public virtual ICollection<PageBanner> PageBanners { get; set; } = [];
+        public virtual ICollection<PageProduct> PageProducts { get; set; } = [];
     }
 }
